@@ -22,7 +22,7 @@ from PyQt6.QtGui import QPixmap, QPen, QColor, QImage
 from PIL import Image
 
 
-# ‼️ Custom Graphics Item for the Crop Box to handle dragging limits
+
 class CropBox(QGraphicsRectItem):
     def __init__(self, rect, image_rect):
         super().__init__(rect)
@@ -34,7 +34,7 @@ class CropBox(QGraphicsRectItem):
             | QGraphicsRectItem.GraphicsItemFlag.ItemSendsGeometryChanges
         )
 
-    # ‼️ This method is called whenever the item moves. We use it to constrain boundaries.
+
     def itemChange(self, change, value):
         if (
             change == QGraphicsRectItem.GraphicsItemChange.ItemPositionChange
@@ -48,13 +48,13 @@ class CropBox(QGraphicsRectItem):
             proposed_x = new_pos.x()
             proposed_y = new_pos.y()
 
-            # ‼️ Constrain Left and Top
+
             if proposed_x < 0:
                 proposed_x = 0
             if proposed_y < 0:
                 proposed_y = 0
 
-            # ‼️ Constrain Right and Bottom
+
             # If (x + width) > image_width, clamp x to (image_width - width)
             if proposed_x + rect.width() > self.image_rect.width():
                 proposed_x = self.image_rect.width() - rect.width()
@@ -98,7 +98,7 @@ class ImageCropper(QMainWindow):
         sidebar_layout.addSpacing(20)
         sidebar_layout.addWidget(QLabel("Crop Size:"))
 
-        # ‼️ Radio Buttons for sizes
+
         self.size_group = QButtonGroup(self)
         self.radios = []
         for size in [512, 768, 1024]:
@@ -113,7 +113,7 @@ class ImageCropper(QMainWindow):
 
         sidebar_layout.addStretch()
 
-        # ‼️ Overwrite Button
+
         btn_save = QPushButton("Overwrite Original")
         btn_save.setStyleSheet(
             "background-color: #8b0000; color: white; font-weight: bold; padding: 10px;"
@@ -128,12 +128,16 @@ class ImageCropper(QMainWindow):
         self.view.setBackgroundBrush(QColor("#333333"))
         main_layout.addWidget(self.view)
 
-    def load_image(self):
-        file_name, _ = QFileDialog.getOpenFileName(
-            self, "Open Image", "", "Images (*.png *.jpg *.jpeg *.bmp *.webp)"
-        )
-        if file_name:
-            self.image_path = file_name
+
+    def load_image(self, file_path=None):
+        # If file_path is None or False (from button click), open dialog
+        if not file_path:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "Open Image", "", "Images (*.png *.jpg *.jpeg *.bmp *.webp)"
+            )
+
+        if file_path:
+            self.image_path = file_path
             self.scene.clear()
             self.crop_item = None
 
@@ -147,7 +151,7 @@ class ImageCropper(QMainWindow):
             self.scene.setSceneRect(rect)
 
             self.add_crop_box()
-            self.setWindowTitle(f"Cropper - {os.path.basename(file_name)}")
+            self.setWindowTitle(f"Cropper - {os.path.basename(file_path)}")
 
     def change_crop_size(self, size_id):
         self.current_crop_size = size_id
@@ -167,7 +171,7 @@ class ImageCropper(QMainWindow):
         rect = QRectF(0, 0, self.current_crop_size, self.current_crop_size)
         image_rect = self.pixmap_item.boundingRect()
 
-        # ‼️ Create our custom item with built-in constraints
+
         self.crop_item = CropBox(rect, image_rect)
 
         # Reset position to (0,0) or clamp if somehow out of bounds immediately
@@ -193,7 +197,7 @@ class ImageCropper(QMainWindow):
             y = int(pos.y())
             size = self.current_crop_size
 
-            # ‼️ Use Pillow to perform the actual crop and save
+
             try:
                 with Image.open(self.image_path) as img:
                     # Box tuple is (left, upper, right, lower)
@@ -201,8 +205,8 @@ class ImageCropper(QMainWindow):
                     cropped_img = img.crop(crop_box)
                     cropped_img.save(self.image_path)
 
-                # Reload the UI to show the new cropped image
-                self.load_image()
+
+                self.load_image(self.image_path)
                 QMessageBox.information(self, "Success", "Image cropped and saved!")
 
             except Exception as e:
@@ -210,7 +214,7 @@ class ImageCropper(QMainWindow):
 
 
 if __name__ == "__main__":
-    # ‼️ Set environment variable to ensure Wayland usage if available, or xcb fallback
+
     # os.environ["QT_QPA_PLATFORM"] = "wayland;xcb"
 
     app = QApplication(sys.argv)
