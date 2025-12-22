@@ -8,9 +8,9 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QGraphicsRectItem, QButtonGroup, QMessageBox, QLabel, QProgressDialog)
 from PyQt6.QtCore import Qt, QRectF, QPointF
 from PyQt6.QtGui import QPixmap, QPen, QColor, QImage
-import cv2  # ‼️ Requires: pip install opencv-python
+import cv2
 
-# ‼️ Reusing the same constraint logic from the image tool
+
 class CropBox(QGraphicsRectItem):
     def __init__(self, rect, image_rect):
         super().__init__(rect)
@@ -81,7 +81,7 @@ class VideoCropper(QMainWindow):
 
         sidebar_layout.addStretch()
 
-        # ‼️ Overwrite Button
+
         btn_save = QPushButton("Overwrite Original")
         btn_save.setStyleSheet("background-color: #8b0000; color: white; font-weight: bold; padding: 10px;")
         btn_save.clicked.connect(self.overwrite_video)
@@ -96,7 +96,7 @@ class VideoCropper(QMainWindow):
 
     def load_video(self, file_path=None):
         if not file_path:
-            # ‼️ Filter changed to video formats
+
             file_path, _ = QFileDialog.getOpenFileName(
                 self, "Open Video", "", "Videos (*.mp4 *.mkv *.avi *.mov *.webm)"
             )
@@ -106,7 +106,7 @@ class VideoCropper(QMainWindow):
             self.scene.clear()
             self.crop_item = None
 
-            # ‼️ Use OpenCV to grab the first frame for preview
+
             cap = cv2.VideoCapture(self.video_path)
             ret, frame = cap.read()
             cap.release()
@@ -163,10 +163,10 @@ class VideoCropper(QMainWindow):
             w = self.current_crop_size
             h = self.current_crop_size
 
-            # ‼️ Create a temp filename
+
             temp_output = self.video_path + "_temp_crop.mp4"
 
-            # ‼️ Construct FFmpeg command
+
             # -vf crop=w:h:x:y -> Applies the crop video filter
             # -c:a copy -> Copies audio without re-encoding (fast)
             # -y -> Overwrite temp file if exists
@@ -194,7 +194,7 @@ class VideoCropper(QMainWindow):
                 progress.close()
 
                 if result.returncode == 0:
-                    # ‼️ Move temp file over original
+
                     shutil.move(temp_output, self.video_path)
                     
                     self.load_video(self.video_path)
