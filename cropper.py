@@ -74,7 +74,6 @@ class ImageCropper(QMainWindow):
         self.pixmap_item = None
         self.crop_item = None
 
-
         self.crop_sizes = [
             (512, 512),
             (768, 768),
@@ -107,7 +106,6 @@ class ImageCropper(QMainWindow):
         self.size_group = QButtonGroup(self)
         self.radios = []
 
-
         for i, (w, h) in enumerate(self.crop_sizes):
             rb = QRadioButton(f"{w}x{h}")
             if i == 0:
@@ -125,6 +123,7 @@ class ImageCropper(QMainWindow):
             "background-color: #8b0000; color: white; font-weight: bold; padding: 10px;"
         )
         btn_save.clicked.connect(self.overwrite_image)
+        btn_save.setShortcut("Return")
         sidebar_layout.addWidget(btn_save)
 
         main_layout.addWidget(sidebar)
@@ -159,7 +158,6 @@ class ImageCropper(QMainWindow):
             self.setWindowTitle(f"Cropper - {os.path.basename(file_path)}")
 
     def change_crop_size(self, size_id):
-
         self.current_crop_size = self.crop_sizes[size_id]
         if self.pixmap_item:
             self.add_crop_box()
@@ -171,7 +169,6 @@ class ImageCropper(QMainWindow):
         # Remove old box if exists
         if self.crop_item:
             self.scene.removeItem(self.crop_item)
-
 
         w, h = self.current_crop_size
 
@@ -186,23 +183,67 @@ class ImageCropper(QMainWindow):
 
         self.scene.addItem(self.crop_item)
 
+
+    def get_next_file(self):
+        if not self.image_path:
+            return None
+
+        directory = os.path.dirname(self.image_path)
+        filename = os.path.basename(self.image_path)
+        extensions = {".png", ".jpg", ".jpeg", ".bmp", ".webp"}
+
+        files = []
+        try:
+            # List all files and sort them to ensure consistent order
+            for f in sorted(os.listdir(directory)):
+                if os.path.splitext(f)[1].lower() in extensions:
+                    files.append(f)
+        except OSError:
+            return None
+
+        if filename not in files:
+            return None
+
+        current_index = files.index(filename)
+        # Check if there is a next file
+        if current_index + 1 < len(files):
+            return os.path.join(directory, files[current_index + 1])
+
+        return None
+
     def overwrite_image(self):
         if not self.image_path or not self.crop_item:
             return
 
-        confirm = QMessageBox.question(
-            self,
-            "Confirm Overwrite",
-            "This will PERMANENTLY overwrite the original file.\nAre you sure?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Confirm Overwrite")
+        msg_box.setText(
+            "This will PERMANENTLY overwrite the original file.\nAre you sure?"
         )
 
-        if confirm == QMessageBox.StandardButton.Yes:
+        # Add buttons
+        btn_overwrite = msg_box.addButton(
+            "Overwrite", QMessageBox.ButtonRole.AcceptRole
+        )
+        btn_overwrite_next = msg_box.addButton(
+            "Overwrite & Next", QMessageBox.ButtonRole.AcceptRole
+        )
+        btn_cancel = msg_box.addButton(QMessageBox.StandardButton.Cancel)
+
+        msg_box.setDefaultButton(
+            btn_overwrite_next
+        )
+
+        msg_box.exec()
+        clicked_button = msg_box.clickedButton()
+
+
+        if clicked_button in (btn_overwrite, btn_overwrite_next):
             # Get coordinates relative to the image
             pos = self.crop_item.pos()
             x = int(pos.x())
             y = int(pos.y())
-
 
             w, h = self.current_crop_size
 
@@ -214,8 +255,23 @@ class ImageCropper(QMainWindow):
                     cropped_img = img.crop(crop_box)
                     cropped_img.save(self.image_path)
 
-                self.load_image(self.image_path)
-                QMessageBox.information(self, "Success", "Image cropped and saved!")
+
+                if clicked_button == btn_overwrite_next:
+                    next_file = self.get_next_file()
+                    if next_file:
+                        self.load_image(next_file)
+                        # Optional: Show a small status bar message instead of a popup to keep flow going
+                        # self.statusBar().showMessage(f"Loaded next: {os.path.basename(next_file)}", 3000)
+                    else:
+                        QMessageBox.information(
+                            self,
+                            "Success",
+                            "Image saved!\n(No next image found in directory)",
+                        )
+                        self.load_image(self.image_path)  # Reload current if no next
+                else:
+                    self.load_image(self.image_path)
+                    QMessageBox.information(self, "Success", "Image cropped and saved!")
 
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to save image: {str(e)}")

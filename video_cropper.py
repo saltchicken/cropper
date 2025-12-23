@@ -72,7 +72,6 @@ class VideoCropper(QMainWindow):
         self.pixmap_item = None
         self.crop_item = None
 
-
         self.crop_sizes = [
             (512, 512),
             (768, 768),
@@ -103,7 +102,6 @@ class VideoCropper(QMainWindow):
         self.size_group = QButtonGroup(self)
         self.radios = []
 
-
         for i, (w, h) in enumerate(self.crop_sizes):
             rb = QRadioButton(f"{w}x{h}")
             if i == 0:
@@ -121,6 +119,7 @@ class VideoCropper(QMainWindow):
             "background-color: #8b0000; color: white; font-weight: bold; padding: 10px;"
         )
         btn_save.clicked.connect(self.overwrite_video)
+        btn_save.setShortcut("Return")
         sidebar_layout.addWidget(btn_save)
 
         main_layout.addWidget(sidebar)
@@ -168,7 +167,6 @@ class VideoCropper(QMainWindow):
             self.setWindowTitle(f"Video Cropper - {os.path.basename(file_path)}")
 
     def change_crop_size(self, size_id):
-
         self.current_crop_size = self.crop_sizes[size_id]
         if self.pixmap_item:
             self.add_crop_box()
@@ -179,7 +177,6 @@ class VideoCropper(QMainWindow):
         if self.crop_item:
             self.scene.removeItem(self.crop_item)
 
-
         w, h = self.current_crop_size
         rect = QRectF(0, 0, w, h)
         image_rect = self.pixmap_item.boundingRect()
@@ -187,18 +184,60 @@ class VideoCropper(QMainWindow):
         self.crop_item.setPos(0, 0)
         self.scene.addItem(self.crop_item)
 
+
+    def get_next_file(self):
+        if not self.video_path:
+            return None
+
+        directory = os.path.dirname(self.video_path)
+        filename = os.path.basename(self.video_path)
+        extensions = {".mp4", ".mkv", ".avi", ".mov", ".webm"}
+
+        files = []
+        try:
+            for f in sorted(os.listdir(directory)):
+                if os.path.splitext(f)[1].lower() in extensions:
+                    files.append(f)
+        except OSError:
+            return None
+
+        if filename not in files:
+            return None
+
+        current_index = files.index(filename)
+        if current_index + 1 < len(files):
+            return os.path.join(directory, files[current_index + 1])
+
+        return None
+
     def overwrite_video(self):
         if not self.video_path or not self.crop_item:
             return
 
-        confirm = QMessageBox.question(
-            self,
-            "Confirm Overwrite",
-            "This will process the ENTIRE video using ffmpeg.\nIt will overwrite the original file.\nAre you sure?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Confirm Overwrite")
+        msg_box.setText(
+            "This will process the ENTIRE video using ffmpeg.\nIt will overwrite the original file.\nAre you sure?"
         )
 
-        if confirm == QMessageBox.StandardButton.Yes:
+        btn_overwrite = msg_box.addButton(
+            "Overwrite", QMessageBox.ButtonRole.AcceptRole
+        )
+        btn_overwrite_next = msg_box.addButton(
+            "Overwrite & Next", QMessageBox.ButtonRole.AcceptRole
+        )
+        btn_cancel = msg_box.addButton(QMessageBox.StandardButton.Cancel)
+
+        msg_box.setDefaultButton(
+            btn_overwrite_next
+        )
+
+        msg_box.exec()
+        clicked_button = msg_box.clickedButton()
+
+
+        if clicked_button in (btn_overwrite, btn_overwrite_next):
             pos = self.crop_item.pos()
             x = int(pos.x())
             y = int(pos.y())
@@ -242,8 +281,23 @@ class VideoCropper(QMainWindow):
                 if result.returncode == 0:
                     shutil.move(temp_output, self.video_path)
 
-                    self.load_video(self.video_path)
-                    QMessageBox.information(self, "Success", "Video cropped and saved!")
+
+                    if clicked_button == btn_overwrite_next:
+                        next_file = self.get_next_file()
+                        if next_file:
+                            self.load_video(next_file)
+                        else:
+                            QMessageBox.information(
+                                self,
+                                "Success",
+                                "Video saved!\n(No next video found in directory)",
+                            )
+                            self.load_video(self.video_path)
+                    else:
+                        self.load_video(self.video_path)
+                        QMessageBox.information(
+                            self, "Success", "Video cropped and saved!"
+                        )
                 else:
                     QMessageBox.critical(
                         self, "FFmpeg Error", f"Error:\n{result.stderr}"
