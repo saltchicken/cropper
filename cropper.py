@@ -22,7 +22,6 @@ from PyQt6.QtGui import QPixmap, QPen, QColor, QImage
 from PIL import Image
 
 
-
 class CropBox(QGraphicsRectItem):
     def __init__(self, rect, image_rect):
         super().__init__(rect)
@@ -33,7 +32,6 @@ class CropBox(QGraphicsRectItem):
             QGraphicsRectItem.GraphicsItemFlag.ItemIsMovable
             | QGraphicsRectItem.GraphicsItemFlag.ItemSendsGeometryChanges
         )
-
 
     def itemChange(self, change, value):
         if (
@@ -48,12 +46,10 @@ class CropBox(QGraphicsRectItem):
             proposed_x = new_pos.x()
             proposed_y = new_pos.y()
 
-
             if proposed_x < 0:
                 proposed_x = 0
             if proposed_y < 0:
                 proposed_y = 0
-
 
             # If (x + width) > image_width, clamp x to (image_width - width)
             if proposed_x + rect.width() > self.image_rect.width():
@@ -77,7 +73,17 @@ class ImageCropper(QMainWindow):
         self.image_path = None
         self.pixmap_item = None
         self.crop_item = None
-        self.current_crop_size = 512
+
+
+        self.crop_sizes = [
+            (512, 512),
+            (768, 768),
+            (1024, 1024),
+            (720, 1280),
+            (1280, 720),
+        ]
+        self.current_crop_size = self.crop_sizes[0]
+
         self.scene = QGraphicsScene()
 
         # Main Layout
@@ -98,21 +104,21 @@ class ImageCropper(QMainWindow):
         sidebar_layout.addSpacing(20)
         sidebar_layout.addWidget(QLabel("Crop Size:"))
 
-
         self.size_group = QButtonGroup(self)
         self.radios = []
-        for size in [512, 768, 1024]:
-            rb = QRadioButton(f"{size}x{size}")
-            if size == 512:
+
+
+        for i, (w, h) in enumerate(self.crop_sizes):
+            rb = QRadioButton(f"{w}x{h}")
+            if i == 0:
                 rb.setChecked(True)
-            self.size_group.addButton(rb, size)  # Set ID to size
+            self.size_group.addButton(rb, i)
             sidebar_layout.addWidget(rb)
             self.radios.append(rb)
 
         self.size_group.idClicked.connect(self.change_crop_size)
 
         sidebar_layout.addStretch()
-
 
         btn_save = QPushButton("Overwrite Original")
         btn_save.setStyleSheet(
@@ -127,7 +133,6 @@ class ImageCropper(QMainWindow):
         self.view = QGraphicsView(self.scene)
         self.view.setBackgroundBrush(QColor("#333333"))
         main_layout.addWidget(self.view)
-
 
     def load_image(self, file_path=None):
         # If file_path is None or False (from button click), open dialog
@@ -154,7 +159,8 @@ class ImageCropper(QMainWindow):
             self.setWindowTitle(f"Cropper - {os.path.basename(file_path)}")
 
     def change_crop_size(self, size_id):
-        self.current_crop_size = size_id
+
+        self.current_crop_size = self.crop_sizes[size_id]
         if self.pixmap_item:
             self.add_crop_box()
 
@@ -166,11 +172,12 @@ class ImageCropper(QMainWindow):
         if self.crop_item:
             self.scene.removeItem(self.crop_item)
 
-        # Create new rect (0, 0, width, height)
-        # Note: Position is handled separately by setPos
-        rect = QRectF(0, 0, self.current_crop_size, self.current_crop_size)
-        image_rect = self.pixmap_item.boundingRect()
 
+        w, h = self.current_crop_size
+
+        # Create new rect (0, 0, width, height)
+        rect = QRectF(0, 0, w, h)
+        image_rect = self.pixmap_item.boundingRect()
 
         self.crop_item = CropBox(rect, image_rect)
 
@@ -195,16 +202,17 @@ class ImageCropper(QMainWindow):
             pos = self.crop_item.pos()
             x = int(pos.x())
             y = int(pos.y())
-            size = self.current_crop_size
 
+
+            w, h = self.current_crop_size
 
             try:
                 with Image.open(self.image_path) as img:
                     # Box tuple is (left, upper, right, lower)
-                    crop_box = (x, y, x + size, y + size)
+
+                    crop_box = (x, y, x + w, y + h)
                     cropped_img = img.crop(crop_box)
                     cropped_img.save(self.image_path)
-
 
                 self.load_image(self.image_path)
                 QMessageBox.information(self, "Success", "Image cropped and saved!")
@@ -214,7 +222,6 @@ class ImageCropper(QMainWindow):
 
 
 if __name__ == "__main__":
-
     # os.environ["QT_QPA_PLATFORM"] = "wayland;xcb"
 
     app = QApplication(sys.argv)
